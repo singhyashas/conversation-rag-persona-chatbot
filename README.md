@@ -163,17 +163,6 @@ The current dataset run produced:
 - `35,181` retrieval documents
 - persona JSON for `User 1` and `User 2`
 
-## Cloud Deployment
-
-Recommended deployment target: Streamlit Community Cloud.
-
-Steps:
-
-1. Push this project to a GitHub repository.
-2. Go to Streamlit Community Cloud.
-3. Create a new app from the GitHub repository.
-4. Set the main file path to `app.py`.
-5. Deploy.
 
 Hosted app URL:
 
@@ -186,18 +175,10 @@ https://kastack-m6qtwwxrpdlou94ex7hgrp.streamlit.app/
 Loom video:
 
 ```text
-TODO: paste Loom demo URL here
+https://www.loom.com/share/ddb963dd831f4182b55ecdb918bc8a6c
 ```
 
-Suggested demo flow:
-
-1. Open the Streamlit app.
-2. Ask `What kind of person is this user?`
-3. Ask `What are User 1 habits?`
-4. Ask `What did the user say about moving to Portland?`
-5. Show the retrieved topic summaries and message chunks.
-6. Open the Persona tab and show evidence-backed claims.
-7. Open Topic Checkpoints and 100-Message Checkpoints.
+]
 
 ## Notes
 
