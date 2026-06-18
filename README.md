@@ -178,7 +178,7 @@ Steps:
 Hosted app URL:
 
 ```text
-TODO: paste Streamlit Cloud URL here
+https://kastack-m6qtwwxrpdlou94ex7hgrp.streamlit.app/
 ```
 
 ## Demo
