@@ -175,7 +175,7 @@ https://kastack-m6qtwwxrpdlou94ex7hgrp.streamlit.app/
 Loom video:
 
 ```text
-https://www.loom.com/share/ddb963dd831f4182b55ecdb918bc8a6c
+
 ```
 
 ]
