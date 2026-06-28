@@ -1,10 +1,8 @@
-﻿.git
+.git
 .agents
 .codex
 __pycache__
 *.pyc
-*.pyo
-*.pyd
 .venv
 venv
 env
@@ -12,10 +10,11 @@ env
 .env.*
 .DS_Store
 desktop.ini
-*.log
-.pytest_cache
-.mypy_cache
-.ruff_cache
 screenshots
 conversations.csv
 data/processed/messages.json
+Dockerfile
+.dockerignore
+.pytest_cache
+.mypy_cache
+.ruff_cache
