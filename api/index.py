@@ -1,3 +1,6 @@
+import json
+from functools import lru_cache
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -11,6 +14,24 @@ from src.config import (
 
 
 app = FastAPI(title="Conversation RAG Persona Chatbot")
+
+
+@lru_cache(maxsize=1)
+def load_processed_data() -> dict:
+    with TOPIC_CHECKPOINTS_PATH.open("r", encoding="utf-8") as handle:
+        topic_checkpoints = json.load(handle)
+    with HUNDRED_CHECKPOINTS_PATH.open("r", encoding="utf-8") as handle:
+        hundred_checkpoints = json.load(handle)
+    with PERSONA_PATH.open("r", encoding="utf-8") as handle:
+        persona = json.load(handle)
+    with RETRIEVAL_DOCUMENTS_PATH.open("r", encoding="utf-8") as handle:
+        retrieval_documents = json.load(handle)
+    return {
+        "topic_checkpoints": topic_checkpoints,
+        "hundred_checkpoints": hundred_checkpoints,
+        "persona": persona,
+        "retrieval_documents": retrieval_documents,
+    }
 
 
 def processed_files_ready() -> bool:
@@ -44,6 +65,22 @@ def compact_docs(documents: list[dict], max_chars: int = 700) -> list[dict]:
     return compact
 
 
+def compact_checkpoint(checkpoint: dict, max_chars: int = 420) -> dict:
+    summary = " ".join(checkpoint.get("summary", checkpoint.get("text", "")).split())
+    if len(summary) > max_chars:
+        summary = summary[: max_chars - 3].rstrip() + "..."
+    return {
+        "id": checkpoint.get("topic_id", checkpoint.get("checkpoint_id", checkpoint.get("doc_id"))),
+        "title": checkpoint.get("title"),
+        "type": checkpoint.get("type"),
+        "start_message_id": checkpoint.get("start_message_id"),
+        "end_message_id": checkpoint.get("end_message_id"),
+        "message_count": checkpoint.get("message_count", checkpoint.get("metadata", {}).get("message_count")),
+        "keywords": checkpoint.get("keywords", [])[:8],
+        "summary": summary,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return """
@@ -61,6 +98,10 @@ def home() -> str:
         --line: #d8dee8;
         --soft: #f5f7fb;
         --accent: #0f766e;
+        --accent-soft: #e7f3f1;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
@@ -91,6 +132,52 @@ def home() -> str:
         padding: 18px;
         background: var(--soft);
       }
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 22px 0 18px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+      }
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .metric strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 24px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--line);
+        margin: 10px 0 24px;
+      }
+      .tab {
+        background: transparent;
+        color: var(--ink);
+        border-radius: 0;
+        padding: 12px 10px;
+        border-bottom: 3px solid transparent;
+      }
+      .tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .tab-panel {
+        display: none;
+      }
+      .tab-panel.active {
+        display: block;
+      }
       .row {
         display: flex;
         gap: 10px;
@@ -120,7 +207,7 @@ def home() -> str:
         margin: 12px 0 0;
       }
       .examples button {
-        background: #e7f3f1;
+        background: var(--accent-soft);
         color: #0b5c56;
         padding: 9px 11px;
         font-weight: 650;
@@ -138,6 +225,25 @@ def home() -> str:
         margin-top: 10px;
         background: #fff;
       }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .persona-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        background: #fff;
+      }
+      .claim {
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+        margin-top: 10px;
+      }
+      .claim strong {
+        display: block;
+      }
       .doc strong {
         display: block;
         margin-bottom: 6px;
@@ -148,6 +254,9 @@ def home() -> str:
         margin-bottom: 8px;
       }
       @media (max-width: 720px) {
+        .status-grid, .grid {
+          grid-template-columns: 1fr;
+        }
         .row {
           flex-direction: column;
         }
@@ -164,28 +273,61 @@ def home() -> str:
         A lightweight Vercel interface over the local RAG backend. It retrieves topic summaries,
         raw message chunks, 100-message checkpoints, and evidence-backed persona data.
       </p>
-      <section class="panel">
-        <div class="row">
-          <input id="query" placeholder="Ask any question, e.g. What are User 1 habits?" />
-          <button onclick="ask()">Ask</button>
-        </div>
-        <div class="examples">
-          <button onclick="fillQuestion('What kind of person is this user?')">What kind of person is this user?</button>
-          <button onclick="fillQuestion('What are User 1 habits?')">What are User 1 habits?</button>
-          <button onclick="fillQuestion('How does User 2 talk?')">How does User 2 talk?</button>
-          <button onclick="fillQuestion('What did the user say about moving to Portland?')">Moving to Portland</button>
-        </div>
+      <section class="status-grid" id="status"></section>
+      <nav class="tabs">
+        <button class="tab active" onclick="showTab('chat', this)">Chatbot</button>
+        <button class="tab" onclick="showTab('persona', this)">Persona</button>
+        <button class="tab" onclick="showTab('topics', this)">Topic Checkpoints</button>
+        <button class="tab" onclick="showTab('hundreds', this)">100-Message Checkpoints</button>
+        <button class="tab" onclick="showTab('corpus', this)">Evidence Corpus</button>
+      </nav>
+      <section id="chat" class="tab-panel active">
+        <section class="panel">
+          <div class="row">
+            <input id="query" placeholder="Ask any question, e.g. What are User 1 habits?" />
+            <button onclick="ask()">Ask</button>
+          </div>
+          <div class="examples">
+            <button onclick="fillQuestion('What kind of person is this user?')">What kind of person is this user?</button>
+            <button onclick="fillQuestion('What are User 1 habits?')">What are User 1 habits?</button>
+            <button onclick="fillQuestion('How does User 2 talk?')">How does User 2 talk?</button>
+            <button onclick="fillQuestion('What did the user say about moving to Portland?')">Moving to Portland</button>
+          </div>
+        </section>
+        <section class="section">
+          <h2>Answer</h2>
+          <div id="answer" class="panel">Ask a question to begin.</div>
+        </section>
+        <section class="section">
+          <h2>Retrieved Evidence</h2>
+          <div id="evidence"></div>
+        </section>
       </section>
-      <section class="section">
-        <h2>Answer</h2>
-        <div id="answer" class="panel">Ask a question to begin.</div>
+      <section id="persona" class="tab-panel">
+        <h2>Persona</h2>
+        <div id="persona-content" class="grid"></div>
       </section>
-      <section class="section">
-        <h2>Retrieved Evidence</h2>
-        <div id="evidence"></div>
+      <section id="topics" class="tab-panel">
+        <h2>Topic Checkpoints</h2>
+        <div id="topic-content"></div>
+      </section>
+      <section id="hundreds" class="tab-panel">
+        <h2>100-Message Checkpoints</h2>
+        <div id="hundred-content"></div>
+      </section>
+      <section id="corpus" class="tab-panel">
+        <h2>Evidence Corpus</h2>
+        <div id="corpus-content"></div>
       </section>
     </main>
     <script>
+      function showTab(id, button) {
+        document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
+        document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+        document.getElementById(id).classList.add("active");
+        button.classList.add("active");
+      }
+
       function fillQuestion(value) {
         document.getElementById("query").value = value;
       }
@@ -199,6 +341,58 @@ def home() -> str:
             <div>${doc.text}</div>
           </div>
         `).join("");
+      }
+
+      function renderCheckpointDocs(docs) {
+        return docs.map(doc => `
+          <div class="doc">
+            <strong>${doc.title || `${doc.type || "checkpoint"} ${doc.id}`}</strong>
+            <div class="meta">messages ${doc.start_message_id}-${doc.end_message_id} | ${doc.message_count || ""} messages</div>
+            <div>${doc.summary || doc.text || ""}</div>
+            ${doc.keywords && doc.keywords.length ? `<div class="meta">keywords: ${doc.keywords.join(", ")}</div>` : ""}
+          </div>
+        `).join("");
+      }
+
+      function renderPersona(data) {
+        const speakers = data.speakers || {};
+        document.getElementById("persona-content").innerHTML = Object.entries(speakers).map(([speaker, persona]) => {
+          const style = persona.communication_style || {};
+          const claims = ["habits", "personal_facts", "personality_traits"].map(category => {
+            const items = (persona[category] || []).slice(0, 5);
+            if (!items.length) return "";
+            return `<h3>${category.replaceAll("_", " ")}</h3>` + items.map(item => `
+              <div class="claim">
+                <strong>${item.claim}</strong>
+                <div class="meta">${item.confidence} confidence | seen ${item.count} times</div>
+                <div>${item.evidence && item.evidence[0] ? item.evidence[0].text : ""}</div>
+              </div>
+            `).join("");
+          }).join("");
+          return `
+            <article class="persona-card">
+              <h3>${speaker}</h3>
+              <p>${(style.style_notes || []).join(", ")}</p>
+              <div class="meta">messages ${style.message_count || 0} | avg words ${style.average_content_words || 0} | question rate ${style.question_rate || 0}</div>
+              ${claims}
+            </article>
+          `;
+        }).join("");
+      }
+
+      async function loadDashboard() {
+        const response = await fetch("/api/dashboard");
+        const data = await response.json();
+        document.getElementById("status").innerHTML = `
+          <div class="metric"><span>Topic Checkpoints</span><strong>${data.counts.topic_checkpoints}</strong></div>
+          <div class="metric"><span>100-Message Checkpoints</span><strong>${data.counts.hundred_checkpoints}</strong></div>
+          <div class="metric"><span>Retrieval Documents</span><strong>${data.counts.retrieval_documents}</strong></div>
+          <div class="metric"><span>Speakers</span><strong>${data.counts.speakers}</strong></div>
+        `;
+        renderPersona(data.persona);
+        document.getElementById("topic-content").innerHTML = renderCheckpointDocs(data.topic_checkpoints);
+        document.getElementById("hundred-content").innerHTML = renderCheckpointDocs(data.hundred_checkpoints);
+        document.getElementById("corpus-content").innerHTML = renderCheckpointDocs(data.retrieval_documents);
       }
 
       async function ask() {
@@ -222,6 +416,8 @@ def home() -> str:
           renderDocs("Message Chunks", data.message_chunk_results) +
           renderDocs("100-Message Summaries", data.hundred_message_results);
       }
+
+      loadDashboard();
     </script>
   </body>
 </html>
@@ -230,10 +426,50 @@ def home() -> str:
 
 @app.get("/api/status")
 def status() -> dict:
+    counts = {}
+    if processed_files_ready():
+        data = load_processed_data()
+        counts = {
+            "topic_checkpoints": len(data["topic_checkpoints"]),
+            "hundred_checkpoints": len(data["hundred_checkpoints"]),
+            "retrieval_documents": len(data["retrieval_documents"]),
+            "speakers": len(data["persona"].get("speakers", {})),
+        }
     return {
         "app": "Conversation RAG Persona Chatbot",
         "processed_files_ready": processed_files_ready(),
+        "counts": counts,
     }
+
+
+@app.get("/api/dashboard")
+def dashboard() -> JSONResponse:
+    if not processed_files_ready():
+        return JSONResponse(
+            {"error": "Processed files are missing. Run python preprocess.py before deploying."},
+            status_code=500,
+        )
+    data = load_processed_data()
+    return JSONResponse(
+        {
+            "counts": {
+                "topic_checkpoints": len(data["topic_checkpoints"]),
+                "hundred_checkpoints": len(data["hundred_checkpoints"]),
+                "retrieval_documents": len(data["retrieval_documents"]),
+                "speakers": len(data["persona"].get("speakers", {})),
+            },
+            "persona": data["persona"],
+            "topic_checkpoints": [
+                compact_checkpoint(checkpoint) for checkpoint in data["topic_checkpoints"][:50]
+            ],
+            "hundred_checkpoints": [
+                compact_checkpoint(checkpoint) for checkpoint in data["hundred_checkpoints"][:50]
+            ],
+            "retrieval_documents": [
+                compact_checkpoint(document) for document in data["retrieval_documents"][:50]
+            ],
+        }
+    )
 
 
 @app.post("/api/ask")
