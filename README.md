@@ -57,6 +57,19 @@ Run the chatbot app:
 streamlit run app.py
 ```
 
+Run with Docker:
+
+```bash
+docker build -t conversation-rag-persona-chatbot .
+docker run --rm -p 8501:8501 conversation-rag-persona-chatbot
+```
+
+Then open:
+
+```text
+http://localhost:8501
+```
+
 You can also query the backend directly:
 
 ```bash
