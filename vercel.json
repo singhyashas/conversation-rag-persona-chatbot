@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/**/*.py": {
+    "api/index.py": {
       "excludeFiles": "{screenshots/**,conversations.csv,data/processed/messages.json,Dockerfile,.dockerignore,**/__pycache__/**,**/*.pyc,.pytest_cache/**,.mypy_cache/**,.ruff_cache/**}"
     }
   },
