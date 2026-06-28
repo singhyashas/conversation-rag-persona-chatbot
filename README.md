@@ -4,6 +4,11 @@ A FastAPI-based RAG chatbot for analyzing conversation history. The project proc
 
 The system is designed to be explainable and local-first. It uses deterministic parsing, checkpointing, summarization, and BM25-style retrieval implemented in Python instead of depending on external LLM APIs.
 
+## Links
+
+- GitHub Repository: `https://github.com/singhyashas/conversation-rag-persona-chatbot`
+- Live Vercel App: `https://singhyashas-conversation-rag-person.vercel.app/`
+
 ## Features
 
 - Chronological message parsing from `conversations.csv`
@@ -155,7 +160,7 @@ data/processed/retrieval_documents.json
 Vercel app URL:
 
 ```text
-TODO: paste deployed Vercel URL here
+https://singhyashas-conversation-rag-person.vercel.app/
 ```
 
 ## How Topic Changes Are Detected
@@ -251,4 +256,4 @@ Screenshots are available in the `screenshots/` folder.
 
 ## Notes
 
-The project intentionally uses local logic and lightweight retrieval. It does not depend on ChatGPT or external LLM APIs, which keeps the implementation explainable and reproducible.
+The project intentionally uses local logic and lightweight retrieval. It does not depend on external hosted LLM APIs, which keeps the implementation explainable and reproducible.
