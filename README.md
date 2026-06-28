@@ -120,7 +120,7 @@ Open:
 http://localhost:8000
 ```
 
-The Docker image runs the FastAPI app with Uvicorn. The `.dockerignore` file excludes development files, screenshots, the raw CSV, and `messages.json`; the runtime keeps the processed retrieval documents, topic checkpoints, 100-message checkpoints, and persona file.
+The Docker image runs the FastAPI app with Uvicorn. The `.dockerignore` file excludes development files, the raw CSV, and `messages.json`; the runtime keeps the processed retrieval documents, topic checkpoints, 100-message checkpoints, and persona file.
 
 ## Vercel Deployment
 
@@ -251,8 +251,6 @@ Loom video:
 ```text
 TODO: paste demo video URL here
 ```
-
-Screenshots are available in the `screenshots/` folder.
 
 ## Notes
 
